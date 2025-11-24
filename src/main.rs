@@ -1,4 +1,6 @@
 mod app;
+mod components;
+mod types;
 
 use app::*;
 use leptos::prelude::*;

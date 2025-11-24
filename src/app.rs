@@ -1,7 +1,9 @@
+use crate::components::config_form::ConfigForm;
+use crate::components::log_viewer::LogViewer;
+use crate::components::toast::{Toast, ToastMessage, ToastType};
+use crate::types::{CommandResponse, LogType, RustFsConfig};
 use leptos::ev::SubmitEvent;
 use leptos::prelude::*;
-use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::VecDeque;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::*;
@@ -24,46 +26,27 @@ fn is_tauri() -> bool {
         .unwrap_or(false)
 }
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "dialog"])]
-    async fn open(options: JsValue) -> JsValue;
-
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct RustFsConfig {
-    data_path: String,
-    port: Option<u16>,
-    host: Option<String>,
-    access_key: Option<String>,
-    secret_key: Option<String>,
-    console_enable: bool,
-}
-
-impl Default for RustFsConfig {
-    fn default() -> Self {
-        Self {
-            data_path: String::new(),
-            port: Some(9000),
-            host: Some("127.0.0.1".to_string()),
-            access_key: Some("rustfsadmin".to_string()),
-            secret_key: Some("rustfsadmin".to_string()),
-            console_enable: false,
+fn load_config() -> RustFsConfig {
+    if let Some(window) = web_sys::window() {
+        if let Ok(Some(storage)) = window.local_storage() {
+            if let Ok(Some(json)) = storage.get_item("rustfs_config") {
+                if let Ok(config) = serde_json::from_str(&json) {
+                    return config;
+                }
+            }
         }
     }
+    RustFsConfig::default()
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum LogType {
-    App,
-    RustFS,
-}
-
-#[derive(Debug, Deserialize)]
-struct CommandResponse {
-    success: bool,
-    message: String,
+fn save_config(config: &RustFsConfig) {
+    if let Some(window) = web_sys::window() {
+        if let Ok(Some(storage)) = window.local_storage() {
+            if let Ok(json) = serde_json::to_string(config) {
+                let _ = storage.set_item("rustfs_config", &json);
+            }
+        }
+    }
 }
 
 const APP_LOG_CAPACITY: usize = 100;
@@ -80,32 +63,86 @@ fn push_log(writer: WriteSignal<VecDeque<String>>, msg: String, capacity: usize)
 
 #[component]
 pub fn App() -> impl IntoView {
-    let (config, set_config) = signal(RustFsConfig::default());
-    let (status, set_status) = signal(String::new());
+    let (config, set_config) = signal(load_config());
+
+    Effect::new(move |_| {
+        save_config(&config.get());
+    });
+
+    let (toasts, set_toasts) = signal(Vec::<ToastMessage>::new());
     let (is_running, set_is_running) = signal(false);
-    let (show_secret, set_show_secret) = signal(false);
     let (app_logs, set_app_logs) = signal(VecDeque::<String>::new());
     let (rustfs_logs, set_rustfs_logs) = signal(VecDeque::<String>::new());
     let (current_log_type, set_current_log_type) = signal(LogType::App);
-    let logs_ref = NodeRef::<leptos::html::Div>::new();
+    let (service_status, set_service_status) = signal(false);
 
-    let select_folder = move |_| {
-        spawn_local(async move {
-            let options = serde_wasm_bindgen::to_value(&serde_json::json!({
-                "directory": true,
-                "title": "Select RustFS Data Directory"
-            }))
-            .unwrap();
-
-            if let Some(result) = open(options).await.as_string() {
-                if !result.is_empty() {
-                    set_config.update(|c| c.data_path = result);
-                }
-            }
+    let remove_toast = Callback::new(move |id: u64| {
+        set_toasts.update(|current| {
+            current.retain(|t| t.id != id);
         });
+    });
+
+    let show_toast = move |message: String, toast_type: ToastType| {
+        let id = js_sys::Date::now() as u64;
+        set_toasts.update(|current| {
+            current.push(ToastMessage {
+                message,
+                toast_type,
+                id,
+            });
+        });
+
+        // Auto remove after 3 seconds
+        let _ = web_sys::window()
+            .unwrap()
+            .set_timeout_with_callback_and_timeout_and_arguments_0(
+                Closure::once_into_js(move || {
+                    remove_toast.run(id);
+                })
+                .unchecked_ref(),
+                3000,
+            );
     };
 
-    let logs_ref_clone = logs_ref.clone();
+    // Health Check Polling
+    Effect::new(move |_| {
+        spawn_local(async move {
+            if !is_tauri() {
+                return;
+            }
+
+            let closure = Closure::wrap(Box::new(move || {
+                spawn_local(async move {
+                    let current = config.get_untracked();
+                    if let Some(port) = current.port {
+                        let host = current.host.unwrap_or_else(|| "127.0.0.1".to_string());
+
+                        let args = js_sys::Object::new();
+                        js_sys::Reflect::set(&args, &"host".into(), &host.into()).unwrap();
+                        js_sys::Reflect::set(&args, &"port".into(), &port.into()).unwrap();
+
+                        match tauri_invoke("check_tcp_connection", args.into())
+                            .await
+                            .as_bool()
+                        {
+                            Some(is_active) => set_service_status.set(is_active),
+                            None => set_service_status.set(false),
+                        }
+                    }
+                });
+            }) as Box<dyn FnMut()>);
+
+            let _ = web_sys::window()
+                .unwrap()
+                .set_interval_with_callback_and_timeout_and_arguments_0(
+                    closure.as_ref().unchecked_ref(),
+                    3000, // 3 seconds
+                );
+
+            closure.forget(); // Leak the closure to keep it alive
+        });
+    });
+
     let app_log_writer = set_app_logs;
     let rustfs_log_writer = set_rustfs_logs;
 
@@ -127,32 +164,44 @@ pub fn App() -> impl IntoView {
 
         const APP_LOG_EVENT: &str = "app-log";
         const RUSTFS_LOG_EVENT: &str = "rustfs-log";
+        const RUSTFS_EXIT_EVENT: &str = "rustfs-exit";
 
         fn create_log_listener(
             logs_signal: WriteSignal<VecDeque<String>>,
             max_logs: usize,
-            logs_ref: NodeRef<leptos::html::Div>,
         ) -> Closure<dyn FnMut(JsValue)> {
             Closure::wrap(Box::new(move |event: JsValue| {
                 if let Ok(payload) = js_sys::Reflect::get(&event, &"payload".into()) {
                     if let Some(log) = payload.as_string() {
                         push_log(logs_signal, log, max_logs);
-                        if let Some(element) = logs_ref.get() {
-                            element.scroll_to_with_x_and_y(0.0, f64::MAX);
-                        }
                     }
                 }
             }) as Box<dyn FnMut(JsValue)>)
         }
 
+        let exit_listener = Closure::wrap(Box::new(move |event: JsValue| {
+            if let Ok(payload) = js_sys::Reflect::get(&event, &"payload".into()) {
+                if let Some(exit_code) = payload.as_string() {
+                    set_is_running.set(false);
+                    set_service_status.set(false);
+                    show_toast(format!("RustFS exited with code: {}", exit_code), ToastType::Error);
+
+                    // Log it
+                    push_log(
+                        app_log_writer,
+                        format!("[ERROR] RustFS process exited unexpectedly: {}", exit_code),
+                        APP_LOG_CAPACITY,
+                    );
+
+                    // Switch to RustFS logs so user sees why
+                    set_current_log_type.set(LogType::RustFS);
+                }
+            }
+        }) as Box<dyn FnMut(JsValue)>);
+
         if let Some(window) = web_sys::window() {
-            let app_listener =
-                create_log_listener(app_log_writer, APP_LOG_CAPACITY, logs_ref_clone.clone());
-            let rustfs_listener = create_log_listener(
-                rustfs_log_writer,
-                RUSTFS_LOG_CAPACITY,
-                logs_ref_clone.clone(),
-            );
+            let app_listener = create_log_listener(app_log_writer, APP_LOG_CAPACITY);
+            let rustfs_listener = create_log_listener(rustfs_log_writer, RUSTFS_LOG_CAPACITY);
 
             if let Ok(tauri) = js_sys::Reflect::get(&window, &"__TAURI__".into()) {
                 if let Ok(event) = js_sys::Reflect::get(&tauri, &"event".into()) {
@@ -169,12 +218,18 @@ pub fn App() -> impl IntoView {
                             &RUSTFS_LOG_EVENT.into(),
                             rustfs_listener.as_ref().unchecked_ref(),
                         );
+                        let _ = listen_fn.call2(
+                            &event,
+                            &RUSTFS_EXIT_EVENT.into(),
+                            exit_listener.as_ref().unchecked_ref(),
+                        );
                     }
                 }
             }
 
             app_listener.forget();
             rustfs_listener.forget();
+            exit_listener.forget();
         }
 
         // Fetch initial logs
@@ -192,7 +247,7 @@ pub fn App() -> impl IntoView {
     let launch_rustfs = move |ev: SubmitEvent| {
         ev.prevent_default();
         set_is_running.set(true);
-        set_status.set("Launching RustFS...".to_string());
+        show_toast("Launching RustFS...".to_string(), ToastType::Info);
 
         let now = js_sys::Date::new_0().to_locale_time_string("en-US".into());
         push_log(
@@ -209,7 +264,7 @@ pub fn App() -> impl IntoView {
         spawn_local(async move {
             // Check if we're in Tauri environment
             if !is_tauri() {
-                set_status.set("Error: Not running in Tauri environment".to_string());
+                show_toast("Error: Not running in Tauri environment".to_string(), ToastType::Error);
                 push_log(
                     set_app_logs,
                     "[ERROR] Not running in Tauri environment".to_string(),
@@ -259,7 +314,7 @@ pub fn App() -> impl IntoView {
                     );
 
                     if success {
-                        set_status.set("RustFS launched successfully!".to_string());
+                        show_toast("RustFS launched successfully!".to_string(), ToastType::Success);
                         let now = js_sys::Date::new_0().to_locale_time_string("en-US".into());
                         push_log(
                             set_app_logs,
@@ -267,203 +322,91 @@ pub fn App() -> impl IntoView {
                             APP_LOG_CAPACITY,
                         );
                     } else {
-                        set_status.set(format!("Launch result: {}", message));
+                        show_toast(format!("Launch failed: {}", message), ToastType::Error);
                         let now = js_sys::Date::new_0().to_locale_time_string("en-US".into());
                         push_log(
                             set_app_logs,
                             format!("[{}] Launch result: {}", now, message),
                             APP_LOG_CAPACITY,
                         );
+                        set_is_running.set(false);
                     }
                 }
                 Err(_) => {
-                    set_status.set("RustFS launch command sent".to_string());
+                    show_toast("RustFS launch command failed".to_string(), ToastType::Error);
                     let now = js_sys::Date::new_0().to_locale_time_string("en-US".into());
                     push_log(
                         set_app_logs,
                         format!("[{}] Launch completed but response parsing failed", now),
                         APP_LOG_CAPACITY,
                     );
+                    set_is_running.set(false);
                 }
             }
-            set_is_running.set(false);
+        });
+    };
+
+    let stop_rustfs = move |_| {
+        show_toast("Stopping RustFS...".to_string(), ToastType::Info);
+        push_log(set_app_logs, "Stopping RustFS...".to_string(), APP_LOG_CAPACITY);
+
+        spawn_local(async move {
+            let result_value = tauri_invoke("stop_rustfs", js_sys::Object::new().into()).await;
+            
+            match serde_wasm_bindgen::from_value::<CommandResponse>(result_value) {
+                Ok(res) => {
+                    if res.success {
+                        set_is_running.set(false);
+                        set_service_status.set(false);
+                        show_toast("RustFS stopped".to_string(), ToastType::Success);
+                        push_log(set_app_logs, "RustFS stopped successfully".to_string(), APP_LOG_CAPACITY);
+                    } else {
+                        show_toast(format!("Failed to stop: {}", res.message), ToastType::Error);
+                        push_log(set_app_logs, format!("Failed to stop: {}", res.message), APP_LOG_CAPACITY);
+                    }
+                }
+                Err(_) => {
+                    show_toast("Failed to parse stop response".to_string(), ToastType::Error);
+                }
+            }
         });
     };
 
     view! {
         <style>{LOGS_CSS}</style>
         <main class="container">
-            <div class="header">
-                <h1>"RustFS Launcher"</h1>
-                <p class="subtitle">"Simple launcher for RustFS project"</p>
-            </div>
-
-            <form class="config-form" on:submit=launch_rustfs>
-                <div class="form-group">
-                    <label for="data-path">"Data Path" <span class="required">"*"</span></label>
-                    <div class="path-input-group">
-                        <input
-                            id="data-path"
-                            type="text"
-                            placeholder="Select data directory..."
-                            prop:value=move || config.get().data_path
-                            on:input=move |ev| {
-                                let value = event_target_value(&ev);
-                                set_config.update(|c| c.data_path = value);
-                            }
-                        />
-                        <button type="button" class="browse-btn" on:click=select_folder>
-                            "Browse"
-                        </button>
+            <Toast toasts=toasts remove_toast=remove_toast />
+            
+            <div class="sidebar">
+                <div class="header">
+                    <h1>"RustFS Launcher"</h1>
+                    <p class="subtitle">"Simple launcher for RustFS project"</p>
+                    <div class="service-indicator" class:online=move || service_status.get()>
+                        <span class="status-dot"></span>
+                        <span class="status-text">
+                            {move || if service_status.get() { "Service Online" } else { "Service Offline" }}
+                        </span>
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="port">"Port"</label>
-                        <input
-                            id="port"
-                            type="number"
-                            placeholder="8080"
-                            prop:value=move || config.get().port.map(|p| p.to_string()).unwrap_or_default()
-                            on:input=move |ev| {
-                                let value = event_target_value(&ev);
-                                let port = if value.is_empty() { None } else { value.parse().ok() };
-                                set_config.update(|c| c.port = port);
-                            }
-                        />
-                    </div>
-                    <div class="form-group">
-                        <label for="host">"Host"</label>
-                        <input
-                            id="host"
-                            type="text"
-                            placeholder="127.0.0.1"
-                            prop:value=move || config.get().host.unwrap_or_default()
-                            on:input=move |ev| {
-                                let value = event_target_value(&ev);
-                                let host = if value.is_empty() { None } else { Some(value) };
-                                set_config.update(|c| c.host = host);
-                            }
-                        />
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="access-key">"Access Key"</label>
-                        <input
-                            id="access-key"
-                            type="text"
-                            placeholder="rustfsadmin"
-                            prop:value=move || config.get().access_key.unwrap_or_default()
-                            on:input=move |ev| {
-                                let value = event_target_value(&ev);
-                                let access_key = if value.is_empty() { None } else { Some(value) };
-                                set_config.update(|c| c.access_key = access_key);
-                            }
-                        />
-                    </div>
-                    <div class="form-group">
-                        <label for="secret-key">"Secret Key"</label>
-                        <div class="input-with-toggle">
-                            <input
-                                id="secret-key"
-                                type=move || if show_secret.get() { "text" } else { "password" }
-                                placeholder="rustfsadmin"
-                                prop:value=move || config.get().secret_key.unwrap_or_default()
-                                on:input=move |ev| {
-                                    let value = event_target_value(&ev);
-                                    let secret_key = if value.is_empty() { None } else { Some(value) };
-                                    set_config.update(|c| c.secret_key = secret_key);
-                                }
-                            />
-                            <button
-                                type="button"
-                                class="toggle-visibility"
-                                on:click=move |_| set_show_secret.update(|show| *show = !*show)
-                            >
-                                {move || if show_secret.get() { "🙈" } else { "👁️" }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <div class="checkbox-group">
-                            <input
-                                id="console-enable"
-                                type="checkbox"
-                                prop:checked=move || config.get().console_enable
-                                on:change=move |ev| {
-                                    let checked = event_target_checked(&ev);
-                                    set_config.update(|c| c.console_enable = checked);
-                                }
-                            />
-                            <label for="console-enable">"Enable Console"</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-actions">
-                    <button
-                        type="submit"
-                        class="launch-btn"
-                        disabled=move || is_running.get() || config.get().data_path.is_empty()
-                    >
-                        { move || if is_running.get() { "Launching..." } else { "Launch RustFS" } }
-                    </button>
-                </div>
-            </form>
-
-            <div class="status" class:hidden=move || status.get().is_empty()>
-                <p>{ move || status.get() }</p>
+                <ConfigForm
+                    config=config
+                    set_config=set_config
+                    is_running=is_running
+                    on_launch=Callback::new(launch_rustfs)
+                    on_stop=Callback::new(stop_rustfs)
+                />
             </div>
 
             <div class="logs-section">
-                <div class="log-panel">
-                    <div class="log-tabs">
-                        <button
-                            class="log-tab"
-                            class:active=move || current_log_type.get() == LogType::App
-                            on:click=move |_| set_current_log_type.set(LogType::App)
-                        >
-                            "App Logs"
-                        </button>
-                        <button
-                            class="log-tab"
-                            class:active=move || current_log_type.get() == LogType::RustFS
-                            on:click=move |_| set_current_log_type.set(LogType::RustFS)
-                        >
-                            "RustFS Output"
-                        </button>
-                    </div>
-                    <div class="log-output" node_ref=logs_ref>
-                        <For
-                            each=move || {
-                                match current_log_type.get() {
-                                    LogType::App => app_logs.get(),
-                                    LogType::RustFS => rustfs_logs.get(),
-                                }
-                                .into_iter()
-                                .collect::<Vec<_>>()
-                            }
-                            key=|log| log.clone()
-                            let:log
-                        >
-                            <div class="log-line">{log}</div>
-                        </For>
-                        <Show when=move || {
-                            match current_log_type.get() {
-                                LogType::App => app_logs.get().is_empty(),
-                                LogType::RustFS => rustfs_logs.get().is_empty(),
-                            }
-                        }>
-                            <div class="log-line">"No logs available"</div>
-                        </Show>
-                    </div>
-                </div>
+                <LogViewer
+                    app_logs=app_logs
+                    set_app_logs=set_app_logs
+                    rustfs_logs=rustfs_logs
+                    set_rustfs_logs=set_rustfs_logs
+                    current_log_type=current_log_type
+                    set_current_log_type=set_current_log_type
+                />
             </div>
         </main>
     }

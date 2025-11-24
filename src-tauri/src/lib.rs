@@ -6,7 +6,11 @@ mod state;
 
 use log;
 use state::{add_app_log, set_app_handle, terminate_rustfs_process};
-use tauri::Manager;
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
+    Manager, WindowEvent,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -17,9 +21,61 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_single_instance::init(
+            |app, _arguments, _cwd| {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            },
+        ))
         .setup(|app| {
             set_app_handle(app.handle().clone());
             add_app_log("RustFS Launcher started".to_string());
+
+            // Setup System Tray
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            let _tray = TrayIconBuilder::with_id("rustfs-tray")
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "quit" => {
+                        add_app_log("Quit requested from tray, terminating...".to_string());
+                        terminate_rustfs_process();
+                        app.exit(0);
+                    }
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| match event {
+                    TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        ..
+                    } => {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    }
+                    _ => {}
+                })
+                .build(app)?;
 
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -31,19 +87,38 @@ pub fn run() {
 
             Ok(())
         })
-        .on_window_event(|_window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                add_app_log("Application closing, terminating RustFS process...".to_string());
-                terminate_rustfs_process();
+        .on_window_event(|window, event| match event {
+            WindowEvent::CloseRequested { api, .. } => {
+                // Minimize to tray instead of closing
+                window.hide().unwrap();
+                api.prevent_close();
             }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             commands::launch_rustfs,
+            commands::stop_rustfs,
             commands::validate_config,
             commands::get_app_logs,
             commands::get_rustfs_logs,
-            commands::diagnose_rustfs_binary
+            commands::diagnose_rustfs_binary,
+            commands::check_tcp_connection
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error building tauri application")
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::ExitRequested { .. } => {
+                state::terminate_rustfs_process();
+            }
+            tauri::RunEvent::Exit => {
+                state::terminate_rustfs_process();
+            }
+            tauri::RunEvent::Reopen { .. } => {
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+            _ => {}
+        });
 }

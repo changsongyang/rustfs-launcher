@@ -1,155 +1,150 @@
+/* This file is injected into the app, so it can use variables from styles.css */
+
 .logs-section {
-    margin-top: 2rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-    padding-top: 1rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #000000; /* Deep black for terminal feel */
+    overflow: hidden;
 }
 
 .log-panel {
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    height: 400px;
+    flex: 1;
     display: flex;
     flex-direction: column;
-    position: relative;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    max-width: 100%;
+    height: 100%;
+    width: 100%;
+}
+
+.log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #18181b;
+    border-bottom: 1px solid #333;
+    padding-right: 10px;
 }
 
 .log-tabs {
     display: flex;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px 12px 0 0;
-    overflow: hidden;
 }
 
 .log-tab {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    background: rgba(255, 255, 255, 0.1);
+    background: transparent;
     border: none;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.7);
+    color: #71717a;
+    padding: 10px 20px;
+    font-size: 0.85rem;
     cursor: pointer;
-    transition: all 0.3s ease;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: color 0.2s, background-color 0.2s;
+    border-right: 1px solid #333;
 }
 
 .log-tab:hover {
-    background: rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.9);
+    color: #d4d4d8;
+    background-color: #27272a;
 }
 
 .log-tab.active {
-    background: rgba(255, 255, 255, 0.2);
-    color: #ffffff;
-    box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.5);
+    color: #fff;
+    background-color: #000; /* Matches log output bg */
+    border-top: 2px solid var(--accent-color);
 }
 
-.log-tab:first-child {
-    border-radius: 12px 0 0 0;
+.log-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
 }
 
-.log-tab:last-child {
-    border-radius: 0 12px 0 0;
+.auto-scroll-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.auto-scroll-toggle:hover {
+    color: #e2e8f0;
+}
+
+.clear-btn {
+    background: transparent;
+    border: 1px solid #475569;
+    color: #94a3b8;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.clear-btn:hover {
+    color: #ef4444;
+    border-color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
 }
 
 .log-output {
     flex: 1;
-    overflow-y: scroll;
-    padding: 0.75rem;
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
-    font-size: 0.8rem;
-    line-height: 1.5;
-    background: rgba(0, 0, 0, 0.2);
-    color: #e8e8e8;
-    border-radius: 0 0 12px 12px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+    padding: 1rem;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.6; /* Increased from 1.5/1.6? Wait, I set 1.6 before. Let's go 1.7 for more breathing room. */
+    color: #e4e4e7;
+    white-space: pre-wrap;
+    position: relative;
 }
 
-.log-output::-webkit-scrollbar {
-    width: 8px;
-}
-
-.log-output::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 4px;
-}
-
-.log-output::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.log-output::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
+.empty-logs {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #52525b;
+    font-style: italic;
 }
 
 .log-line {
-    padding: 0.25rem 0.5rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    word-break: break-word;
-    transition: background-color 0.2s ease;
+    margin-bottom: 2px;
 }
 
-.log-line:hover {
-    background: rgba(255, 255, 255, 0.05);
+/* Log Levels / Highlighting */
+.log-line:contains("ERROR"), .log-line:contains("error") {
+    color: #f87171;
 }
 
-.log-line:last-child {
-    border-bottom: none;
+.log-line:contains("WARN"), .log-line:contains("warn") {
+    color: #fbbf24;
 }
 
-/* Empty state styling */
-.log-output:empty::before {
-    content: "No logs available";
-    display: block;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.5);
-    font-style: italic;
-    padding: 2rem;
+.log-line:contains("INFO"), .log-line:contains("info") {
+    color: #60a5fa;
 }
 
-/* Timestamp styling */
-.log-line:contains("[") {
-    color: #a8d8ff;
+.log-line:contains("SUCCESS"), .log-line:contains("success") {
+    color: #34d399;
 }
 
-/* Error/warning highlighting */
-.log-line:contains("error"), .log-line:contains("Error"), .log-line:contains("ERROR") {
-    background: rgba(231, 76, 60, 0.1);
-    border-left: 3px solid #e74c3c;
-    color: #ff9999;
+/* Scrollbar for Logs */
+.log-output::-webkit-scrollbar {
+    width: 10px;
 }
 
-.log-line:contains("warning"), .log-line:contains("Warning"), .log-line:contains("WARN") {
-    background: rgba(241, 196, 15, 0.1);
-    border-left: 3px solid #f1c40f;
-    color: #ffeb99;
+.log-output::-webkit-scrollbar-track {
+    background: #18181b;
 }
 
-.log-line:contains("success"), .log-line:contains("Success"), .log-line:contains("OK") {
-    background: rgba(46, 204, 113, 0.1);
-    border-left: 3px solid #2ecc71;
-    color: #99ff99;
+.log-output::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+    border-radius: 5px;
+    border: 2px solid #18181b;
 }
 
-@media (max-width: 768px) {
-    .log-panel {
-        height: 300px;
-    }
-    
-    .log-tab {
-        font-size: 0.8rem;
-        padding: 0.5rem 0.75rem;
-    }
-    
-    .log-output {
-        font-size: 0.75rem;
-        padding: 0.5rem;
-    }
+.log-output::-webkit-scrollbar-thumb:hover {
+    background: #52525b;
 }

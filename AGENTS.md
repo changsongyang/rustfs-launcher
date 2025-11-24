@@ -31,3 +31,6 @@ Follow Conventional Commits (`feat:`, `fix:`, `chore:`) as seen in history; keep
 Split backend and UI updates when practical to aid review.
 PRs should include an intent summary, the commands/tests run (or screenshots for UI tweaks), and links to relevant issues.
 Request review before merging and wait for CI; resolve any fmt/clippy/test failures locally first.
+
+## Communication
+与用户交流时必须全程使用中文。

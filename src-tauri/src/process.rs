@@ -248,7 +248,7 @@ pub fn launch(config: RustFsConfig) -> Result<String> {
         });
     }
 
-    // Register the process for tracking before spawning the wait thread
+    // Register the process for tracking
     set_rustfs_process(child);
 
     Ok(format!("RustFS launched with PID: {}", pid))

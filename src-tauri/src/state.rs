@@ -79,6 +79,56 @@ pub fn set_rustfs_process(process: Child) {
     let pid = process.id();
     *RUSTFS_PROCESS.lock().unwrap() = Some(process);
     add_app_log(format!("RustFS process registered with PID: {}", pid));
+
+    // Spawn a monitor thread
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+
+            let mut should_break = false;
+            {
+                let mut process_guard = RUSTFS_PROCESS.lock().unwrap();
+                if let Some(child) = process_guard.as_mut() {
+                    if child.id() == pid {
+                        match child.try_wait() {
+                            Ok(Some(status)) => {
+                                add_app_log(format!(
+                                    "RustFS process exited with status: {}",
+                                    status
+                                ));
+
+                                // Emit exit event
+                                if let Some(handle) = APP_HANDLE.lock().unwrap().as_ref() {
+                                    let _ = handle.emit("rustfs-exit", format!("{}", status));
+                                }
+
+                                // Clear the process from state since it exited
+                                *process_guard = None;
+                                should_break = true;
+                            }
+                            Ok(None) => {
+                                // Still running
+                            }
+                            Err(e) => {
+                                add_app_log(format!("Error monitoring process: {}", e));
+                                should_break = true;
+                            }
+                        }
+                    } else {
+                        // PID mismatch, likely a new process was started
+                        should_break = true;
+                    }
+                } else {
+                    // No process in state
+                    should_break = true;
+                }
+            }
+
+            if should_break {
+                break;
+            }
+        }
+    });
 }
 
 pub fn terminate_rustfs_process() {
