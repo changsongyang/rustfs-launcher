@@ -4,7 +4,6 @@ mod error;
 mod process;
 mod state;
 
-use log;
 use state::{add_app_log, set_app_handle, terminate_rustfs_process};
 use tauri::{
     menu::{Menu, MenuItem},
@@ -58,11 +57,12 @@ pub fn run() {
                     }
                     _ => {}
                 })
-                .on_tray_icon_event(|tray, event| match event {
-                    TrayIconEvent::Click {
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         ..
-                    } => {
+                    } = event
+                    {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
                             if window.is_visible().unwrap_or(false) {
@@ -73,7 +73,6 @@ pub fn run() {
                             }
                         }
                     }
-                    _ => {}
                 })
                 .build(app)?;
 
@@ -87,13 +86,12 @@ pub fn run() {
 
             Ok(())
         })
-        .on_window_event(|window, event| match event {
-            WindowEvent::CloseRequested { api, .. } => {
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
                 // Minimize to tray instead of closing
                 window.hide().unwrap();
                 api.prevent_close();
             }
-            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             commands::launch_rustfs,

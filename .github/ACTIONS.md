@@ -151,6 +151,31 @@ strategy:
 
 ## 本地测试工作流
 
+### 快速开始 - Pre-commit 检查
+
+**推荐: 在提交代码前运行所有检查**
+
+```bash
+make pre-commit
+```
+
+这个命令会自动运行所有 CI 检查项:
+- ✅ 代码格式检查 (`cargo fmt`)
+- ✅ Clippy 静态分析 (`cargo clippy`)
+- ✅ 前端构建 (`trunk build`)
+- ✅ 单元测试 (`cargo test`)
+
+**单独运行检查:**
+```bash
+make check-fmt      # 仅检查格式
+make check-clippy   # 仅运行 Clippy
+make check-frontend # 仅构建前端
+make check-test     # 仅运行测试
+make fix-fmt        # 自动修复格式
+```
+
+详细使用说明请参考: [本地测试指南](TESTING.md)
+
 ### 使用 Makefile 和 act 工具
 
 项目提供了 Makefile 来简化本地测试 GitHub Actions 工作流的流程。

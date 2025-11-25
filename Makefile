@@ -1,4 +1,4 @@
-.PHONY: help install-act test-ci test-ci-full clean
+.PHONY: help install-act test-ci test-ci-full clean pre-commit check-fmt check-clippy check-test check-frontend
 
 # Default target
 help:
@@ -6,6 +6,16 @@ help:
 	@echo ""
 	@echo "Available targets:"
 	@echo "  make help          - Show this help message"
+	@echo "  make pre-commit    - Run all pre-commit checks (fmt, clippy, frontend, tests)"
+	@echo ""
+	@echo "Local checks:"
+	@echo "  make check-fmt     - Check Rust code formatting"
+	@echo "  make check-clippy  - Run Clippy linter"
+	@echo "  make check-frontend - Build frontend"
+	@echo "  make check-test    - Run all tests"
+	@echo "  make fix-fmt       - Auto-fix Rust code formatting"
+	@echo ""
+	@echo "Act testing:"
 	@echo "  make install-act   - Install act tool for local GitHub Actions testing"
 	@echo "  make test-ci       - Run CI workflow locally (quick, Ubuntu only)"
 	@echo "  make test-ci-full  - Run CI workflow with full checks"
@@ -33,6 +43,66 @@ check-act:
 		echo "Error: act is not installed. Run 'make install-act' first."; \
 		exit 1; \
 	}
+
+# ============================================================================
+# Pre-commit checks - Run all CI checks locally
+# ============================================================================
+
+# Run all pre-commit checks (matches CI workflow)
+pre-commit: check-fmt check-clippy check-frontend check-test
+	@echo ""
+	@echo "=========================================="
+	@echo "✅ All pre-commit checks passed!"
+	@echo "=========================================="
+	@echo "Your code is ready to commit and push."
+	@echo ""
+
+# Check Rust code formatting
+check-fmt:
+	@echo "=========================================="
+	@echo "📝 Checking Rust code formatting..."
+	@echo "=========================================="
+	@cd src-tauri && cargo fmt --all --check
+	@echo "✅ Formatting check passed!"
+	@echo ""
+
+# Run Clippy linter
+check-clippy:
+	@echo "=========================================="
+	@echo "🔍 Running Clippy linter..."
+	@echo "=========================================="
+	@cd src-tauri && cargo clippy --all-targets --all-features -- -D warnings
+	@echo "✅ Clippy check passed!"
+	@echo ""
+
+# Build frontend
+check-frontend:
+	@echo "=========================================="
+	@echo "🎨 Building frontend..."
+	@echo "=========================================="
+	@trunk build
+	@echo "✅ Frontend build passed!"
+	@echo ""
+
+# Run all tests
+check-test:
+	@echo "=========================================="
+	@echo "🧪 Running tests..."
+	@echo "=========================================="
+	@cd src-tauri && cargo test --all-features
+	@echo "✅ All tests passed!"
+	@echo ""
+
+# Auto-fix Rust code formatting
+fix-fmt:
+	@echo "🔧 Auto-fixing Rust code formatting..."
+	@cd src-tauri && cargo fmt --all
+	@echo "✅ Code formatted!"
+
+# ============================================================================
+# Act testing - Run GitHub Actions locally
+# ============================================================================
+
 
 # Run CI workflow locally (quick test)
 test-ci: check-act
@@ -98,17 +168,3 @@ test-ci-verbose: check-act
 		--platform ubuntu-latest=catthehacker/ubuntu:act-latest \
 		--verbose
 
-# Quick format check only
-test-fmt: check-act
-	@echo "Testing Rust format check..."
-	@cd src-tauri && cargo fmt --all --check
-
-# Quick clippy check only
-test-clippy: check-act
-	@echo "Testing clippy..."
-	@cd src-tauri && cargo clippy --all-targets --all-features -- -D warnings
-
-# Run tests locally
-test-local:
-	@echo "Running tests locally (without act)..."
-	@cd src-tauri && cargo test --all-features

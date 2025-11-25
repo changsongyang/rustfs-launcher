@@ -43,6 +43,38 @@ The build script will automatically detect your platform and download the approp
 
 This approach reduces download time and storage space by only downloading the binary needed for your current platform.
 
+## Development Workflow
+
+### Pre-commit Checks
+
+Before committing your code, run all CI checks locally:
+
+```bash
+make pre-commit
+```
+
+This will run:
+- Code formatting check (`cargo fmt`)
+- Clippy linter (`cargo clippy`)
+- Frontend build (`trunk build`)
+- Unit tests (`cargo test`)
+
+### Individual Checks
+
+```bash
+make check-fmt      # Check code formatting
+make check-clippy   # Run Clippy linter
+make check-frontend # Build frontend
+make check-test     # Run tests
+make fix-fmt        # Auto-fix formatting
+```
+
+### CI/CD
+
+The project uses GitHub Actions for continuous integration and automated releases. See [.github/ACTIONS.md](.github/ACTIONS.md) for details.
+
+For local testing of GitHub Actions workflows, see [.github/TESTING.md](.github/TESTING.md).
+
 ## Recommended IDE Setup
 
 [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).

@@ -227,7 +227,7 @@ pub fn launch(config: RustFsConfig) -> Result<String> {
     if let Some(stdout) = child.stdout.take() {
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
-            for line in reader.lines().filter_map(|l| l.ok()) {
+            for line in reader.lines().map_while(|l| l.ok()) {
                 if line.is_empty() {
                     continue;
                 }
@@ -239,7 +239,7 @@ pub fn launch(config: RustFsConfig) -> Result<String> {
     if let Some(stderr) = child.stderr.take() {
         thread::spawn(move || {
             let reader = BufReader::new(stderr);
-            for line in reader.lines().filter_map(|l| l.ok()) {
+            for line in reader.lines().map_while(|l| l.ok()) {
                 if line.is_empty() {
                     continue;
                 }

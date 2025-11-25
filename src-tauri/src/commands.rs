@@ -16,7 +16,7 @@ pub struct CommandResponse {
 pub async fn launch_rustfs(config: RustFsConfig) -> Result<CommandResponse> {
     let handle = async_runtime::spawn_blocking(move || process::launch(config));
     let message = handle.await.map_err(|err| {
-        let io_error = IoError::new(ErrorKind::Other, err.to_string());
+        let io_error = IoError::other(err.to_string());
         Error::Io(io_error)
     })??;
 
@@ -50,7 +50,7 @@ pub async fn validate_config(config: RustFsConfig) -> Result<bool> {
 pub async fn diagnose_rustfs_binary() -> Result<CommandResponse> {
     let handle = async_runtime::spawn_blocking(process::diagnose_binary);
     let message = handle.await.map_err(|err| {
-        let io_error = IoError::new(ErrorKind::Other, err.to_string());
+        let io_error = IoError::other(err.to_string());
         Error::Io(io_error)
     })??;
 

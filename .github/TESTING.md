@@ -32,6 +32,49 @@ act --version
 
 ## 使用方法
 
+### 提交前检查 (推荐)
+
+**最重要的命令 - 在提交代码前运行:**
+
+```bash
+make pre-commit
+```
+
+这个命令会依次运行所有 CI 检查项,确保你的代码能通过 GitHub Actions CI:
+1. **代码格式检查** - `cargo fmt --all --check`
+2. **Clippy 代码质量检查** - `cargo clippy --all-targets --all-features -- -D warnings`
+3. **前端构建** - `trunk build`
+4. **单元测试** - `cargo test --all-features`
+
+如果所有检查都通过,你会看到:
+```
+==========================================
+✅ All pre-commit checks passed!
+==========================================
+Your code is ready to commit and push.
+```
+
+### 单独运行检查
+
+如果你只想运行特定的检查:
+
+```bash
+# 仅检查代码格式
+make check-fmt
+
+# 仅运行 Clippy
+make check-clippy
+
+# 仅构建前端
+make check-frontend
+
+# 仅运行测试
+make check-test
+
+# 自动修复代码格式
+make fix-fmt
+```
+
 ### 查看所有可用命令
 
 ```bash
@@ -206,28 +249,50 @@ docker system prune -a
 
 ## 最佳实践
 
-1. **推送代码前本地测试**
+1. **提交代码前务必运行**
    ```bash
-   make test-ci
+   make pre-commit
+   ```
+   这是最重要的步骤! 确保你的代码能通过所有 CI 检查。
+
+2. **开发过程中频繁检查**
+   ```bash
+   # 写完代码后快速验证格式
+   make check-fmt
+
+   # 修复格式问题
+   make fix-fmt
+
+   # 验证代码质量
+   make check-clippy
    ```
 
-2. **修改工作流后验证**
+3. **修改工作流后验证**
    ```bash
    make dry-run-ci  # 预览执行计划
    make test-ci     # 实际运行测试
    ```
 
-3. **定期清理缓存**
+4. **定期清理缓存**
    ```bash
    make clean
    ```
 
-4. **使用快速测试加速开发**
+5. **推荐的工作流程**
    ```bash
-   # 仅测试修改的部分
-   make test-fmt     # 格式检查
-   make test-clippy  # 静态分析
-   make test-local   # 单元测试
+   # 1. 编写代码
+   vim src-tauri/src/main.rs
+
+   # 2. 自动修复格式
+   make fix-fmt
+
+   # 3. 运行所有检查
+   make pre-commit
+
+   # 4. 如果通过,提交代码
+   git add .
+   git commit -m "feat: add new feature"
+   git push
    ```
 
 ## 高级用法
