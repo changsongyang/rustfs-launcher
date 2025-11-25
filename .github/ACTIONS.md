@@ -149,9 +149,69 @@ strategy:
 3. **失败容错**: 单个平台失败不影响其他平台编译
 4. **自动化发布**: Tag 推送后自动发布，无需手动操作
 
+## 本地测试工作流
+
+### 使用 Makefile 和 act 工具
+
+项目提供了 Makefile 来简化本地测试 GitHub Actions 工作流的流程。
+
+**安装 act 工具:**
+```bash
+make install-act
+```
+
+**常用命令:**
+```bash
+# 查看所有可用命令
+make help
+
+# 本地运行 CI 工作流 (快速测试)
+make test-ci
+
+# 运行完整的 CI 检查
+make test-ci-full
+
+# 列出所有工作流任务
+make list-jobs
+
+# 仅测试代码格式化
+make test-fmt
+
+# 仅测试 clippy 检查
+make test-clippy
+
+# 清理 act 缓存
+make clean
+```
+
+**注意事项:**
+- 首次运行会下载 Docker 镜像,可能需要几分钟
+- 需要确保 Docker Desktop 已安装并运行
+- 本地测试使用 Linux 容器,行为可能与实际 CI 环境略有差异
+- build 工作流包含平台特定步骤,本地测试可能无法完全模拟
+
+### 手动使用 act
+
+如果需要更细粒度的控制:
+
+```bash
+# 查看 CI 工作流的所有任务
+act -W .github/workflows/ci.yml -l
+
+# 运行特定任务
+act push -W .github/workflows/ci.yml -j check
+
+# 查看将要执行的命令 (dry run)
+act push -W .github/workflows/ci.yml -n
+
+# 使用详细输出
+act push -W .github/workflows/ci.yml --verbose
+```
+
 ## 维护注意事项
 
 - 定期检查 GitHub Actions 的使用配额
 - 保持依赖版本更新
 - 监控 RustFS 二进制文件下载地址的可用性
 - 及时处理编译失败的通知
+- 推送前使用 `make test-ci` 本地验证工作流

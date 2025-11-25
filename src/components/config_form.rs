@@ -35,28 +35,46 @@ pub fn ConfigForm(
                             // Handle File Drop
                             let drop_handler = Closure::wrap(Box::new(move |event: JsValue| {
                                 set_is_drag_over.set(false);
-                                if let Ok(payload) = js_sys::Reflect::get(&event, &"payload".into()) {
-                                    if let Ok(paths) = serde_wasm_bindgen::from_value::<Vec<String>>(payload) {
+                                if let Ok(payload) = js_sys::Reflect::get(&event, &"payload".into())
+                                {
+                                    if let Ok(paths) =
+                                        serde_wasm_bindgen::from_value::<Vec<String>>(payload)
+                                    {
                                         if let Some(first_path) = paths.first() {
                                             set_config.update(|c| c.data_path = first_path.clone());
                                         }
                                     }
                                 }
-                            }) as Box<dyn FnMut(JsValue)>);
+                            })
+                                as Box<dyn FnMut(JsValue)>);
 
                             // Handle Drag Hover (Enter)
                             let hover_handler = Closure::wrap(Box::new(move |_: JsValue| {
                                 set_is_drag_over.set(true);
-                            }) as Box<dyn FnMut(JsValue)>);
+                            })
+                                as Box<dyn FnMut(JsValue)>);
 
                             // Handle Drag Cancel (Leave)
                             let cancel_handler = Closure::wrap(Box::new(move |_: JsValue| {
                                 set_is_drag_over.set(false);
-                            }) as Box<dyn FnMut(JsValue)>);
+                            })
+                                as Box<dyn FnMut(JsValue)>);
 
-                            let _ = listen_fn.call2(&event, &"tauri://file-drop".into(), drop_handler.as_ref().unchecked_ref());
-                            let _ = listen_fn.call2(&event, &"tauri://file-drop-hover".into(), hover_handler.as_ref().unchecked_ref());
-                            let _ = listen_fn.call2(&event, &"tauri://file-drop-cancelled".into(), cancel_handler.as_ref().unchecked_ref());
+                            let _ = listen_fn.call2(
+                                &event,
+                                &"tauri://file-drop".into(),
+                                drop_handler.as_ref().unchecked_ref(),
+                            );
+                            let _ = listen_fn.call2(
+                                &event,
+                                &"tauri://file-drop-hover".into(),
+                                hover_handler.as_ref().unchecked_ref(),
+                            );
+                            let _ = listen_fn.call2(
+                                &event,
+                                &"tauri://file-drop-cancelled".into(),
+                                cancel_handler.as_ref().unchecked_ref(),
+                            );
 
                             drop_handler.forget();
                             hover_handler.forget();
@@ -88,7 +106,7 @@ pub fn ConfigForm(
 
     let handle_submit = move |ev: SubmitEvent| {
         ev.prevent_default();
-        
+
         if is_running.get() {
             // Stop mode
             on_stop.run(());
@@ -97,7 +115,7 @@ pub fn ConfigForm(
             set_error_message.set(None);
 
             let current_config = config.get();
-            
+
             if current_config.data_path.trim().is_empty() {
                 set_error_message.set(Some("Data path is required".to_string()));
                 return;
@@ -118,8 +136,8 @@ pub fn ConfigForm(
         <form class="config-form" on:submit=handle_submit>
             <div class="form-group">
                 <label for="data-path">"Data Path" <span class="required">"*"</span></label>
-                <div 
-                    class="path-input-group" 
+                <div
+                    class="path-input-group"
                     class:drag-over=move || is_drag_over.get()
                 >
                     <input

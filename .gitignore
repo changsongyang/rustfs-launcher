@@ -13,3 +13,8 @@ artifacts/
 *.dmg
 *.msi
 *.app.zip
+*.exe
+
+# act local testing
+.actrc.local
+.secrets

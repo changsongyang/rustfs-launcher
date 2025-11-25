@@ -1,0 +1,14 @@
+# act configuration file
+# This file configures the default behavior of act tool for local GitHub Actions testing
+
+# Use the catthehacker/ubuntu:act-latest image for better compatibility
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Use linux/amd64 architecture
+--container-architecture linux/amd64
+
+# Bind the workspace to improve performance
+--bind
+
+# Reuse containers for faster subsequent runs
+--reuse

@@ -32,8 +32,8 @@ pub fn Toast(
                     class:error=move || toast.toast_type == ToastType::Error
                     class:info=move || toast.toast_type == ToastType::Info
                     on:animationend=move |_| {
-                        // Optional: Remove after animation if handled by CSS, 
-                        // but we use JS timeout usually. 
+                        // Optional: Remove after animation if handled by CSS,
+                        // but we use JS timeout usually.
                         // Here we just let CSS handle entrance.
                     }
                 >

@@ -184,7 +184,10 @@ pub fn App() -> impl IntoView {
                 if let Some(exit_code) = payload.as_string() {
                     set_is_running.set(false);
                     set_service_status.set(false);
-                    show_toast(format!("RustFS exited with code: {}", exit_code), ToastType::Error);
+                    show_toast(
+                        format!("RustFS exited with code: {}", exit_code),
+                        ToastType::Error,
+                    );
 
                     // Log it
                     push_log(
@@ -264,7 +267,10 @@ pub fn App() -> impl IntoView {
         spawn_local(async move {
             // Check if we're in Tauri environment
             if !is_tauri() {
-                show_toast("Error: Not running in Tauri environment".to_string(), ToastType::Error);
+                show_toast(
+                    "Error: Not running in Tauri environment".to_string(),
+                    ToastType::Error,
+                );
                 push_log(
                     set_app_logs,
                     "[ERROR] Not running in Tauri environment".to_string(),
@@ -314,7 +320,10 @@ pub fn App() -> impl IntoView {
                     );
 
                     if success {
-                        show_toast("RustFS launched successfully!".to_string(), ToastType::Success);
+                        show_toast(
+                            "RustFS launched successfully!".to_string(),
+                            ToastType::Success,
+                        );
                         let now = js_sys::Date::new_0().to_locale_time_string("en-US".into());
                         push_log(
                             set_app_logs,
@@ -348,25 +357,40 @@ pub fn App() -> impl IntoView {
 
     let stop_rustfs = move |_| {
         show_toast("Stopping RustFS...".to_string(), ToastType::Info);
-        push_log(set_app_logs, "Stopping RustFS...".to_string(), APP_LOG_CAPACITY);
+        push_log(
+            set_app_logs,
+            "Stopping RustFS...".to_string(),
+            APP_LOG_CAPACITY,
+        );
 
         spawn_local(async move {
             let result_value = tauri_invoke("stop_rustfs", js_sys::Object::new().into()).await;
-            
+
             match serde_wasm_bindgen::from_value::<CommandResponse>(result_value) {
                 Ok(res) => {
                     if res.success {
                         set_is_running.set(false);
                         set_service_status.set(false);
                         show_toast("RustFS stopped".to_string(), ToastType::Success);
-                        push_log(set_app_logs, "RustFS stopped successfully".to_string(), APP_LOG_CAPACITY);
+                        push_log(
+                            set_app_logs,
+                            "RustFS stopped successfully".to_string(),
+                            APP_LOG_CAPACITY,
+                        );
                     } else {
                         show_toast(format!("Failed to stop: {}", res.message), ToastType::Error);
-                        push_log(set_app_logs, format!("Failed to stop: {}", res.message), APP_LOG_CAPACITY);
+                        push_log(
+                            set_app_logs,
+                            format!("Failed to stop: {}", res.message),
+                            APP_LOG_CAPACITY,
+                        );
                     }
                 }
                 Err(_) => {
-                    show_toast("Failed to parse stop response".to_string(), ToastType::Error);
+                    show_toast(
+                        "Failed to parse stop response".to_string(),
+                        ToastType::Error,
+                    );
                 }
             }
         });
@@ -376,7 +400,7 @@ pub fn App() -> impl IntoView {
         <style>{LOGS_CSS}</style>
         <main class="container">
             <Toast toasts=toasts remove_toast=remove_toast />
-            
+
             <div class="sidebar">
                 <div class="header">
                     <h1>"RustFS Launcher"</h1>
