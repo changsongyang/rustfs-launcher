@@ -102,11 +102,12 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install trunk
+          cargo install tauri-cli
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          cargo install trunk
+          cargo install trunk tauri-cli
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
