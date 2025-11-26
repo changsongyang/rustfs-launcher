@@ -164,23 +164,22 @@ jobs:
           ARTIFACT_PREFIX="rustfs-launcher-${{ matrix.os_name }}-${{ matrix.arch }}-${VERSION}"
 
           # 在 workspace 内搜索打包输出，不依赖固定路径
-          mapfile -t APP_DIRS < <(find src-tauri target -path "*bundle/macos/*.app" -type d 2>/dev/null || true)
-          mapfile -t DMG_FILES < <(find src-tauri target -path "*bundle/dmg/*.dmg" -type f 2>/dev/null || true)
+          APP_DIR=$(find src-tauri target -path "*bundle/macos/*.app" -type d -print -quit 2>/dev/null || true)
+          DMG_FILE=$(find src-tauri target -path "*bundle/dmg/*.dmg" -type f -print -quit 2>/dev/null || true)
 
-          echo "发现的 .app 目录：" && printf ' - %s\n' "${APP_DIRS[@]:-无}"
-          echo "发现的 .dmg 文件：" && printf ' - %s\n' "${DMG_FILES[@]:-无}"
+          echo "发现的 .app 目录：${APP_DIR:-无}"
+          echo "发现的 .dmg 文件：${DMG_FILE:-无}"
 
           # Copy and rename DMG
-          if [ ${#DMG_FILES[@]} -gt 0 ]; then
-            cp "${DMG_FILES[0]}" "artifacts/${ARTIFACT_PREFIX}.dmg"
+          if [ -n "$DMG_FILE" ]; then
+            cp "$DMG_FILE" "artifacts/${ARTIFACT_PREFIX}.dmg"
             echo "✅ Created: ${ARTIFACT_PREFIX}.dmg"
           fi
 
           # Create and rename app.zip
-          if [ ${#APP_DIRS[@]} -gt 0 ]; then
-            FIRST_APP="${APP_DIRS[0]}"
-            APP_PARENT="$(dirname "$FIRST_APP")"
-            APP_NAME="$(basename "$FIRST_APP")"
+          if [ -n "$APP_DIR" ]; then
+            APP_PARENT="$(dirname "$APP_DIR")"
+            APP_NAME="$(basename "$APP_DIR")"
             cd "$APP_PARENT"
             zip -r "$GITHUB_WORKSPACE/artifacts/${ARTIFACT_PREFIX}.app.zip" "$APP_NAME"
             echo "✅ Created: ${ARTIFACT_PREFIX}.app.zip"
