@@ -13,6 +13,8 @@ jobs:
   build-check:
     name: Build Strategy Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
       version: ${{ steps.check.outputs.version }}
@@ -59,6 +61,8 @@ jobs:
     name: Build
     needs: build-check
     if: needs.build-check.outputs.should_build == 'true'
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -312,12 +316,20 @@ jobs:
           mkdir -p release-assets
 
           # Copy all artifacts
-          cp artifacts/* release-assets/ || true
+          if [ -d "artifacts" ] && [ "$(ls -A artifacts)" ]; then
+            cp artifacts/* release-assets/
+            echo "✅ Artifacts copied to release-assets"
+          else
+            echo "⚠️ No artifacts found to copy"
+          fi
 
           # Generate checksums
           cd release-assets
-          if ls *.dmg *.zip *.msi *.exe >/dev/null 2>&1; then
-            sha256sum * > SHA256SUMS 2>/dev/null || true
+          if ls *.dmg *.zip *.msi *.exe 2>/dev/null; then
+            sha256sum * > SHA256SUMS
+            echo "✅ SHA256SUMS generated"
+          else
+            echo "⚠️ No files found for checksum generation"
           fi
 
           echo "📦 Release assets:"
