@@ -163,58 +163,30 @@ jobs:
           # Format: rustfs-launcher-{os}-{arch}-{version}
           ARTIFACT_PREFIX="rustfs-launcher-${{ matrix.os_name }}-${{ matrix.arch }}-${VERSION}"
 
-          # 构建产物目录（兼容 src-tauri/target 与 workspace target）
-          DMG_DIR=""
-          BUNDLE_DIR=""
-          DMG_CANDIDATES=(
-            "src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg"
-            "target/${{ matrix.rust_target }}/release/bundle/dmg"
-            "src-tauri/target/release/bundle/dmg"
-            "target/release/bundle/dmg"
-          )
-          BUNDLE_CANDIDATES=(
-            "src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos"
-            "target/${{ matrix.rust_target }}/release/bundle/macos"
-            "src-tauri/target/release/bundle/macos"
-            "target/release/bundle/macos"
-          )
+          # 在 workspace 内搜索打包输出，不依赖固定路径
+          mapfile -t APP_DIRS < <(find src-tauri target -path "*bundle/macos/*.app" -type d 2>/dev/null || true)
+          mapfile -t DMG_FILES < <(find src-tauri target -path "*bundle/dmg/*.dmg" -type f 2>/dev/null || true)
 
-          for d in "${DMG_CANDIDATES[@]}"; do
-            if [ -d "$d" ]; then DMG_DIR="$d"; break; fi
-          done
-          for d in "${BUNDLE_CANDIDATES[@]}"; do
-            if [ -d "$d" ]; then BUNDLE_DIR="$d"; break; fi
-          done
-
-          if [ -z "$DMG_DIR" ] && [ -z "$BUNDLE_DIR" ]; then
-            echo "❌ 未找到打包输出目录，尝试过："
-            printf ' - %s\n' "${DMG_CANDIDATES[@]}" "${BUNDLE_CANDIDATES[@]}"
-            echo "目录列表："
-            ls -la src-tauri || true
-            ls -la target || true
-            exit 1
-          fi
+          echo "发现的 .app 目录：" && printf ' - %s\n' "${APP_DIRS[@]:-无}"
+          echo "发现的 .dmg 文件：" && printf ' - %s\n' "${DMG_FILES[@]:-无}"
 
           # Copy and rename DMG
-          if [ -d "$DMG_DIR" ]; then
-            for dmg in "$DMG_DIR"/*.dmg; do
-              if [ -f "$dmg" ]; then
-                cp "$dmg" "artifacts/${ARTIFACT_PREFIX}.dmg"
-                echo "✅ Created: ${ARTIFACT_PREFIX}.dmg"
-              fi
-            done
+          if [ ${#DMG_FILES[@]} -gt 0 ]; then
+            cp "${DMG_FILES[0]}" "artifacts/${ARTIFACT_PREFIX}.dmg"
+            echo "✅ Created: ${ARTIFACT_PREFIX}.dmg"
           fi
 
           # Create and rename app.zip
-          if [ -d "$BUNDLE_DIR" ]; then
-            cd "$BUNDLE_DIR"
-            app_files=(*.app)
-            if [ ${#app_files[@]} -eq 0 ]; then
-              echo "❌ 未找到 .app 产物，检查打包输出目录：$BUNDLE_DIR"
-              exit 1
-            fi
-            zip -r "$GITHUB_WORKSPACE/artifacts/${ARTIFACT_PREFIX}.app.zip" "${app_files[@]}"
+          if [ ${#APP_DIRS[@]} -gt 0 ]; then
+            FIRST_APP="${APP_DIRS[0]}"
+            APP_PARENT="$(dirname "$FIRST_APP")"
+            APP_NAME="$(basename "$FIRST_APP")"
+            cd "$APP_PARENT"
+            zip -r "$GITHUB_WORKSPACE/artifacts/${ARTIFACT_PREFIX}.app.zip" "$APP_NAME"
             echo "✅ Created: ${ARTIFACT_PREFIX}.app.zip"
+          else
+            echo "❌ 未找到 .app 产物"
+            exit 1
           fi
 
           # Create latest version files
