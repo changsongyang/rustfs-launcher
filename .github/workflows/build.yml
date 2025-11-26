@@ -173,6 +173,12 @@ jobs:
             BUNDLE_DIR="src-tauri/target/release/bundle/macos"
           fi
 
+          if [ ! -d "$DMG_DIR" ] && [ ! -d "$BUNDLE_DIR" ]; then
+            echo "❌ 未找到打包输出目录：$DMG_DIR 或 $BUNDLE_DIR"
+            ls -la src-tauri/target || true
+            exit 1
+          fi
+
           # Copy and rename DMG
           if [ -d "$DMG_DIR" ]; then
             for dmg in "$DMG_DIR"/*.dmg; do
@@ -205,6 +211,12 @@ jobs:
               echo "✅ Created latest: ${LATEST_PREFIX}.${ext}"
             fi
           done
+
+          # 确保确实生成了产物
+          if [ $(ls -1 | wc -l) -eq 0 ]; then
+            echo "❌ 未生成任何 artifacts"
+            exit 1
+          fi
 
           ls -la "$GITHUB_WORKSPACE/artifacts"
 
