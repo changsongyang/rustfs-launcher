@@ -157,12 +157,25 @@ jobs:
         run: |
           mkdir -p artifacts
 
+          # 允许空 glob 返回空数组，避免 zip 在找不到文件时直接失败
+          shopt -s nullglob
+
           # Format: rustfs-launcher-{os}-{arch}-{version}
           ARTIFACT_PREFIX="rustfs-launcher-${{ matrix.os_name }}-${{ matrix.arch }}-${VERSION}"
 
+          # 构建产物目录（兼容默认路径和显式 target 路径）
+          DMG_DIR="src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg"
+          BUNDLE_DIR="src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos"
+          if [ ! -d "$DMG_DIR" ]; then
+            DMG_DIR="src-tauri/target/release/bundle/dmg"
+          fi
+          if [ ! -d "$BUNDLE_DIR" ]; then
+            BUNDLE_DIR="src-tauri/target/release/bundle/macos"
+          fi
+
           # Copy and rename DMG
-          if [ -d "src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg" ]; then
-            for dmg in src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg/*.dmg; do
+          if [ -d "$DMG_DIR" ]; then
+            for dmg in "$DMG_DIR"/*.dmg; do
               if [ -f "$dmg" ]; then
                 cp "$dmg" "artifacts/${ARTIFACT_PREFIX}.dmg"
                 echo "✅ Created: ${ARTIFACT_PREFIX}.dmg"
@@ -171,9 +184,14 @@ jobs:
           fi
 
           # Create and rename app.zip
-          if [ -d "src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos" ]; then
-            cd src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos
-            zip -r "$GITHUB_WORKSPACE/artifacts/${ARTIFACT_PREFIX}.app.zip" *.app
+          if [ -d "$BUNDLE_DIR" ]; then
+            cd "$BUNDLE_DIR"
+            app_files=(*.app)
+            if [ ${#app_files[@]} -eq 0 ]; then
+              echo "❌ 未找到 .app 产物，检查打包输出目录：$BUNDLE_DIR"
+              exit 1
+            fi
+            zip -r "$GITHUB_WORKSPACE/artifacts/${ARTIFACT_PREFIX}.app.zip" "${app_files[@]}"
             echo "✅ Created: ${ARTIFACT_PREFIX}.app.zip"
           fi
 
@@ -188,7 +206,7 @@ jobs:
             fi
           done
 
-          ls -la artifacts/
+          ls -la "$GITHUB_WORKSPACE/artifacts"
 
       - name: Prepare and rename artifacts (Windows)
         if: runner.os == 'Windows'
