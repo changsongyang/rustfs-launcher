@@ -58,6 +58,12 @@ jobs:
             echo "🛠️ Development build detected: $version"
           fi
 
+          # Ensure version starts with 'v' for release builds
+          if [[ "$is_release" == "true" ]] && [[ ! "$version" =~ ^v ]]; then
+            version="v${version}"
+            echo "ℹ️  Version normalized to: $version"
+          fi
+
           echo "should_build=$should_build" >> $GITHUB_OUTPUT
           echo "version=$version" >> $GITHUB_OUTPUT
           echo "is_release=$is_release" >> $GITHUB_OUTPUT
