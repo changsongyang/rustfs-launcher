@@ -104,19 +104,14 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error building tauri application")
-        .run(|app_handle, event| match event {
+        .run(|_app_handle, event| match event {
             tauri::RunEvent::ExitRequested { .. } => {
                 state::terminate_rustfs_process();
             }
             tauri::RunEvent::Exit => {
                 state::terminate_rustfs_process();
             }
-            tauri::RunEvent::Reopen { .. } => {
-                if let Some(window) = app_handle.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
-            }
+            // Reopen event is handled by tauri-plugin-single-instance
             _ => {}
         });
 }

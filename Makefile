@@ -19,7 +19,8 @@ help:
 	@echo "  make install-act   - Install act tool for local GitHub Actions testing"
 	@echo "  make test-ci       - Run CI workflow locally (quick, Ubuntu only)"
 	@echo "  make test-ci-full  - Run CI workflow with full checks"
-	@echo "  make test-build    - Test build workflow locally (single platform)"
+	@echo "  make test-build    - Test build workflow file (validates syntax and logic)"
+	@echo "  make test-build-verbose - Test build workflow with verbose output (for debugging)"
 	@echo "  make list-jobs     - List all available jobs in workflows"
 	@echo "  make clean         - Clean act cache and temporary files"
 	@echo ""
@@ -119,14 +120,41 @@ test-ci-full: check-act
 		--container-architecture linux/amd64 \
 		--platform ubuntu-latest=catthehacker/ubuntu:full-latest
 
-# Test build workflow (manual trigger mode)
+# Test build workflow (validates workflow file syntax and logic)
+# Uses act to verify the build workflow file is correct
+# Note: macOS/Windows build jobs will be skipped (require native runners),
+#       but build-check job will run to validate workflow logic
 test-build: check-act
-	@echo "Testing build workflow (workflow_dispatch mode)..."
-	@echo "Warning: This will attempt to download RustFS binaries and build the app."
-	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
-	@sleep 5
+	@echo "Testing build workflow file..."
+	@echo "Note: This validates the workflow file syntax and logic"
+	@echo "      macOS/Windows build jobs will be skipped (require native runners)"
+	@echo ""
 	act workflow_dispatch -W .github/workflows/build.yml \
-		--container-architecture linux/amd64
+		--container-architecture linux/amd64 \
+		--container-options "--platform linux/amd64"
+
+# Test build workflow with verbose output (for debugging)
+test-build-verbose: check-act
+	@echo "Testing build workflow with verbose output..."
+	@echo "Note: macOS/Windows build jobs will be skipped"
+	@echo ""
+	act workflow_dispatch -W .github/workflows/build.yml \
+		--container-architecture linux/amd64 \
+		--container-options "--platform linux/amd64" \
+		--verbose
+
+# Test build in Docker (can compile and verify build process)
+# This actually compiles the code in Docker, useful for CI validation
+test-build-docker: check-act
+	@echo "=========================================="
+	@echo "🐳 Testing build compilation in Docker..."
+	@echo "=========================================="
+	@echo "This will run CI workflow to verify code compiles"
+	@echo "Press Ctrl+C to cancel, or wait 3 seconds to continue..."
+	@sleep 3
+	act push -W .github/workflows/ci.yml \
+		--container-architecture linux/amd64 \
+		--platform ubuntu-latest=catthehacker/ubuntu:act-latest
 
 # List all jobs in workflows
 list-jobs: check-act

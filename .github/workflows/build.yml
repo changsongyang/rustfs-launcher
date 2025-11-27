@@ -148,7 +148,7 @@ jobs:
           Remove-Item -Recurse -Force rustfs-temp, rustfs-windows-x86_64.zip
 
       - name: Build Tauri application
-        run: cargo tauri build --target ${{ matrix.rust_target }} --target-dir target
+        run: cargo tauri build --target ${{ matrix.rust_target }}
 
       - name: Prepare and rename artifacts (macOS)
         if: runner.os == 'macOS'
