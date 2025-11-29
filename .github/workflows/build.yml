@@ -234,33 +234,65 @@ jobs:
           # Format: rustfs-launcher-{os}-{arch}-{version}
           $ARTIFACT_PREFIX = "rustfs-launcher-${{ matrix.os_name }}-${{ matrix.arch }}-$env:VERSION"
 
+          # 调试：列出可能的构建输出目录
+          $targetPath = "src-tauri/target/${{ matrix.rust_target }}/release/bundle"
+          Write-Host "🔍 搜索构建产物目录: $targetPath"
+          if (Test-Path $targetPath) {
+            Write-Host "📁 Bundle 目录存在，内容："
+            Get-ChildItem -Path $targetPath -Recurse -File | Select-Object FullName, Length | Format-Table -AutoSize
+          } else {
+            Write-Host "❌ Bundle 目录不存在: $targetPath"
+          }
+
+          $artifactCount = 0
+
           # Copy and rename MSI
-          $msiFiles = Get-ChildItem -Path "src-tauri/target/${{ matrix.rust_target }}/release/bundle/msi" -Filter "*.msi" -ErrorAction SilentlyContinue
+          $msiPath = "$targetPath/msi"
+          Write-Host "🔍 搜索 MSI 文件: $msiPath"
+          $msiFiles = Get-ChildItem -Path $msiPath -Filter "*.msi" -ErrorAction SilentlyContinue
           if ($msiFiles) {
-            Copy-Item $msiFiles[0].FullName -Destination "artifacts/${ARTIFACT_PREFIX}.msi"
-            Write-Host "✅ Created: ${ARTIFACT_PREFIX}.msi"
+            $destPath = "artifacts/$ARTIFACT_PREFIX.msi"
+            Copy-Item $msiFiles[0].FullName -Destination $destPath
+            Write-Host "✅ Created: $destPath"
+            $artifactCount++
+          } else {
+            Write-Host "⚠️ 未找到 MSI 文件在: $msiPath"
           }
 
           # Copy and rename EXE (NSIS installer)
-          $exeFiles = Get-ChildItem -Path "src-tauri/target/${{ matrix.rust_target }}/release/bundle/nsis" -Filter "*.exe" -ErrorAction SilentlyContinue
+          $nsisPath = "$targetPath/nsis"
+          Write-Host "🔍 搜索 NSIS EXE 文件: $nsisPath"
+          $exeFiles = Get-ChildItem -Path $nsisPath -Filter "*.exe" -ErrorAction SilentlyContinue
           if ($exeFiles) {
-            Copy-Item $exeFiles[0].FullName -Destination "artifacts/${ARTIFACT_PREFIX}-setup.exe"
-            Write-Host "✅ Created: ${ARTIFACT_PREFIX}-setup.exe"
+            $destPath = "artifacts/$ARTIFACT_PREFIX-setup.exe"
+            Copy-Item $exeFiles[0].FullName -Destination $destPath
+            Write-Host "✅ Created: $destPath"
+            $artifactCount++
+          } else {
+            Write-Host "⚠️ 未找到 NSIS EXE 文件在: $nsisPath"
+          }
+
+          # 检查是否至少生成了一个产物
+          if ($artifactCount -eq 0) {
+            Write-Host "❌ 错误：未找到任何构建产物（MSI 或 EXE）"
+            Write-Host "请检查构建是否成功完成"
+            exit 1
           }
 
           # Create latest version files
           $LATEST_PREFIX = "rustfs-launcher-${{ matrix.os_name }}-${{ matrix.arch }}-latest"
           Get-ChildItem -Path "artifacts" -Filter "rustfs-launcher-*-$env:VERSION.*" | ForEach-Object {
             $ext = $_.Extension
-            $latestName = "${LATEST_PREFIX}${ext}"
+            $latestName = "$LATEST_PREFIX$ext"
             if ($_.Name -like "*-setup.exe") {
-              $latestName = "${LATEST_PREFIX}-setup.exe"
+              $latestName = "$LATEST_PREFIX-setup.exe"
             }
             Copy-Item $_.FullName -Destination "artifacts/$latestName"
             Write-Host "✅ Created latest: $latestName"
           }
 
-          Get-ChildItem -Path artifacts
+          Write-Host "📦 最终 artifacts 列表："
+          Get-ChildItem -Path artifacts | Format-Table Name, Length -AutoSize
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
